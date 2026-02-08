@@ -1,0 +1,51 @@
+# Environment variables (contains secrets)
+.env
+secrets.env
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+ENV/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+*.zip
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+source.zip
+test_key.py
+
+# Serverless UI packages (large dependencies)
+serverless-ui/.package/
+serverless-ui/*.zip
+serverless-ui/*.txt
+serverless-ui/*.json
+
+# Bedrock AgentCore
+.bedrock_agentcore/

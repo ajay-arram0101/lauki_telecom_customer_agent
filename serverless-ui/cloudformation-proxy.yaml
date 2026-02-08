@@ -1,0 +1,225 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Quaki Customer Support - Serverless UI with AgentCore Proxy'
+
+Parameters:
+  StackName:
+    Type: String
+    Default: 'quaki-support'
+    Description: 'Name prefix for all resources'
+  
+  AgentCoreRuntimeId:
+    Type: String
+    Default: 'quaki-jLdRKv6u8W'
+    Description: 'AgentCore Runtime ID'
+  
+  GroqApiKey:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: 'Groq API Key for fallback (optional)'
+
+Resources:
+  # ============================================================
+  # S3 Bucket for Frontend
+  # ============================================================
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'quaki-fe-${AWS::AccountId}-${StackName}'
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: index.html
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ['*']
+            AllowedMethods: [GET, HEAD]
+            AllowedOrigins: ['*']
+            MaxAge: 3600
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: '*'
+            Action: 's3:GetObject'
+            Resource: !Sub '${FrontendBucket.Arn}/*'
+
+  # ============================================================
+  # Lambda Deployment Bucket
+  # ============================================================
+  DeployBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'quaki-deploy-${AWS::AccountId}-${StackName}'
+
+  # ============================================================
+  # IAM Role for Lambda
+  # ============================================================
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'quaki-role-${StackName}'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonBedrockAgentCoreFullAccess
+        - arn:aws:iam::aws:policy/AmazonBedrockFullAccess
+      Policies:
+        - PolicyName: AgentCoreInvokePolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - bedrock-agentcore:InvokeAgentRuntime
+                  - bedrock-agentcore:Invoke*
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                Resource: '*'
+
+  # ============================================================
+  # Lambda Function
+  # ============================================================
+  LambdaFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'quaki-fn-${StackName}'
+      Runtime: python3.11
+      Handler: handler_proxy.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Timeout: 60
+      MemorySize: 512
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {'statusCode': 200, 'body': 'Placeholder - deploy actual code'}
+      Environment:
+        Variables:
+          AGENTCORE_RUNTIME_ID: !Ref AgentCoreRuntimeId
+          GROQ_API_KEY: !Ref GroqApiKey
+          AWS_REGION_NAME: !Ref AWS::Region
+
+  # ============================================================
+  # API Gateway REST API
+  # ============================================================
+  ApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub 'quaki-api-${StackName}'
+      Description: 'Quaki Customer Support API'
+      EndpointConfiguration:
+        Types:
+          - REGIONAL
+
+  ApiResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: 'query'
+
+  # POST Method
+  ApiMethodPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref ApiResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunction.Arn}/invocations'
+
+  # OPTIONS Method for CORS
+  ApiMethodOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref ApiGateway
+      ResourceId: !Ref ApiResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - StatusCode: '200'
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - StatusCode: '200'
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # API Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - ApiMethodPost
+      - ApiMethodOptions
+    Properties:
+      RestApiId: !Ref ApiGateway
+      StageName: 'prod'
+
+  # Lambda Permission for API Gateway
+  LambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref LambdaFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/*'
+
+Outputs:
+  ApiEndpoint:
+    Description: 'API Gateway endpoint URL'
+    Value: !Sub 'https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod/query'
+    Export:
+      Name: !Sub '${StackName}-ApiEndpoint'
+  
+  FrontendUrl:
+    Description: 'Frontend website URL'
+    Value: !Sub 'http://${FrontendBucket}.s3-website.${AWS::Region}.amazonaws.com'
+    Export:
+      Name: !Sub '${StackName}-FrontendUrl'
+  
+  FrontendBucketName:
+    Description: 'Frontend S3 bucket name'
+    Value: !Ref FrontendBucket
+    Export:
+      Name: !Sub '${StackName}-FrontendBucket'
+  
+  DeployBucketName:
+    Description: 'Deployment S3 bucket name'
+    Value: !Ref DeployBucket
+    Export:
+      Name: !Sub '${StackName}-DeployBucket'
+  
+  LambdaFunctionName:
+    Description: 'Lambda function name'
+    Value: !Ref LambdaFunction
+    Export:
+      Name: !Sub '${StackName}-LambdaFunction'

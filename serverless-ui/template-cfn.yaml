@@ -1,0 +1,179 @@
+﻿AWSTemplateFormatVersion: '2010-09-09'
+Description: Quaki Customer Support Agent - Serverless API
+
+Parameters:
+  GroqApiKey:
+    Type: String
+    NoEcho: true
+  DeploymentBucket:
+    Type: String
+
+Resources:
+  # DynamoDB Cache Table
+  ResponseCacheTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'quaki-response-cache-\'
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: query_hash
+          AttributeType: S
+      KeySchema:
+        - AttributeName: query_hash
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
+  # Lambda Execution Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub 'quaki-lambda-role-\'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBAccess
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:Query
+                Resource: !GetAtt ResponseCacheTable.Arn
+
+  # Lambda Function
+  QuakiLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub 'quaki-support-\'
+      Runtime: python3.11
+      Handler: handler.lambda_handler
+      Timeout: 30
+      MemorySize: 256
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        S3Bucket: !Ref DeploymentBucket
+        S3Key: lambda.zip
+      Environment:
+        Variables:
+          GROQ_API_KEY: !Ref GroqApiKey
+          CACHE_TABLE: !Ref ResponseCacheTable
+          CACHE_TTL_SECONDS: '86400'
+          ENABLE_CACHE: 'true'
+          GROQ_MODEL: 'llama-3.1-8b-instant'
+
+  # API Gateway REST API
+  QuakiApi:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: !Sub 'quaki-api-\'
+      Description: Quaki Customer Support API
+
+  # API Resource /query
+  QueryResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      RestApiId: !Ref QuakiApi
+      ParentId: !GetAtt QuakiApi.RootResourceId
+      PathPart: query
+
+  # POST Method
+  QueryPostMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref QuakiApi
+      ResourceId: !Ref QueryResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub 'arn:aws:apigateway:\:lambda:path/2015-03-31/functions/\/invocations'
+
+  # OPTIONS Method for CORS
+  QueryOptionsMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      RestApiId: !Ref QuakiApi
+      ResourceId: !Ref QueryResource
+      HttpMethod: OPTIONS
+      AuthorizationType: NONE
+      Integration:
+        Type: MOCK
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+            ResponseTemplates:
+              application/json: ''
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+
+  # API Deployment
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+      - QueryPostMethod
+      - QueryOptionsMethod
+    Properties:
+      RestApiId: !Ref QuakiApi
+      StageName: prod
+
+  # Lambda Permission for API Gateway
+  LambdaApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref QuakiLambda
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:aws:execute-api:\:\:\/*'
+
+  # S3 Bucket for Frontend
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub 'quaki-frontend-\-\'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal: '*'
+            Action: s3:GetObject
+            Resource: !Sub '\/*'
+
+Outputs:
+  ApiEndpoint:
+    Value: !Sub 'https://\.execute-api.\.amazonaws.com/prod/query'
+  FrontendUrl:
+    Value: !GetAtt FrontendBucket.WebsiteURL
+  FrontendBucket:
+    Value: !Ref FrontendBucket

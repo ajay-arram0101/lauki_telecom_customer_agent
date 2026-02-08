@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quaki Customer Support</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="logo">
+                <span class="logo-icon">📱</span>
+                <h1>Quaki Support</h1>
+            </div>
+            <div class="header-actions">
+                <button class="new-chat-btn" onclick="newConversation()" title="Start new conversation">
+                    🔄 New Chat
+                </button>
+                <span class="status-badge">Online</span>
+            </div>
+        </header>
+
+        <!-- Main Chat Area -->
+        <main class="chat-container">
+            <!-- Welcome Message -->
+            <div class="welcome-section" id="welcomeSection">
+                <div class="welcome-card">
+                    <h2>👋 Welcome to Quaki Customer Support</h2>
+                    <p>I'm your AI assistant for all telecom-related questions. How can I help you today?</p>
+                    
+                    <div class="question-categories">
+                        <h3>I can help you with:</h3>
+                        <div class="category-grid">
+                            <div class="category-card" onclick="askQuestion('What are your mobile data plans?')">
+                                <span class="category-icon">📊</span>
+                                <span class="category-title">Plans & Pricing</span>
+                                <span class="category-desc">Mobile plans, data packs, pricing</span>
+                            </div>
+                            <div class="category-card" onclick="askQuestion('How do I activate roaming?')">
+                                <span class="category-icon">🌍</span>
+                                <span class="category-title">Roaming</span>
+                                <span class="category-desc">International roaming, activation</span>
+                            </div>
+                            <div class="category-card" onclick="askQuestion('How do I check my bill?')">
+                                <span class="category-icon">💳</span>
+                                <span class="category-title">Billing</span>
+                                <span class="category-desc">Bills, payments, dues</span>
+                            </div>
+                            <div class="category-card" onclick="askQuestion('What are your company policies?')">
+                                <span class="category-icon">📋</span>
+                                <span class="category-title">Policies</span>
+                                <span class="category-desc">Terms, refunds, cancellation</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="example-questions">
+                        <h3>Try asking:</h3>
+                        <div class="example-chips">
+                            <button class="chip" onclick="askQuestion('How do I activate roaming?')">How do I activate roaming?</button>
+                            <button class="chip" onclick="askQuestion('What are the prepaid plans?')">What are the prepaid plans?</button>
+                            <button class="chip" onclick="askQuestion('How can I pay my bill?')">How can I pay my bill?</button>
+                            <button class="chip" onclick="askQuestion('How to check data balance?')">How to check data balance?</button>
+                            <button class="chip" onclick="askQuestion('What is the refund policy?')">What is the refund policy?</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Messages -->
+            <div class="messages-container" id="messagesContainer">
+                <!-- Messages will be dynamically added here -->
+            </div>
+        </main>
+
+        <!-- Input Area -->
+        <footer class="input-area">
+            <div class="input-container">
+                <input 
+                    type="text" 
+                    id="userInput" 
+                    placeholder="Ask about plans, billing, roaming, or policies..." 
+                    autocomplete="off"
+                    onkeypress="handleKeyPress(event)"
+                >
+                <button id="sendBtn" onclick="sendMessage()" aria-label="Send message">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13M22 2L15 22L11 13M11 13L2 9L22 2"/>
+                    </svg>
+                </button>
+            </div>
+            <p class="disclaimer">AI responses are for informational purposes. For account-specific issues, please contact support.</p>
+        </footer>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner"></div>
+        <p>Getting your answer...</p>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
