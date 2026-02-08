@@ -2,11 +2,11 @@
 
 An AI-powered customer support agent for **Lauki Phones** (a fictional telecom provider), built with LangGraph and deployed on AWS Bedrock AgentCore with short-term and long-term memory capabilities.
 
-## 🚀 Live Demo
+## Live Demo
 
 **[Try the Agent →](http://quaki-fe-125975759762-quaki-support.s3-website.us-east-2.amazonaws.com/)**
 
-## 📋 Project Overview
+##  Project Overview
 
 This project demonstrates an end-to-end AI customer support solution that:
 
@@ -19,7 +19,7 @@ This project demonstrates an end-to-end AI customer support solution that:
 
 Traditional rule-based chatbots fail when customers ask questions in unexpected ways. This agent uses semantic understanding to match customer queries to the right answers, even when phrasing differs from the original FAQ. The memory layer enables multi-turn conversations where the agent remembers previous interactions.
 
-## 📊 Dataset
+##  Dataset
 
 The agent is powered by `lauki_qna.csv` — a curated FAQ dataset containing **76 question-answer pairs** covering typical telecom customer inquiries:
 
@@ -36,7 +36,7 @@ The agent is powered by `lauki_qna.csv` — a curated FAQ dataset containing **7
 
 Each FAQ entry includes detailed, technically accurate answers simulating real telecom support documentation.
 
-## 🏗️ Architecture
+##  Architecture
 
 ```
 ┌─────────────────┐     ┌──────────────────┐     ┌─────────────────────┐
@@ -52,7 +52,7 @@ Each FAQ entry includes detailed, technically accurate answers simulating real t
                                                  └─────────────────────┘
 ```
 
-## 🛠️ Tech Stack
+##  Tech Stack
 
 - **Agent Framework**: LangGraph
 - **LLM**: OpenAI `gpt-4o-mini`
@@ -62,7 +62,7 @@ Each FAQ entry includes detailed, technically accurate answers simulating real t
 - **Frontend**: HTML/CSS/JS hosted on S3
 - **Infrastructure**: Lambda, API Gateway, ECR, CodeBuild
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 ├── 02_agentcore_memory.py   # Main agent code (deployed)
@@ -75,13 +75,11 @@ Each FAQ entry includes detailed, technically accurate answers simulating real t
     └── lambda/              # API proxy handlers
 ```
 
-## 🚀 Getting Started
+##  Getting Started
 
 1. Clone the repository
 2. Copy `.sample_env` to `.env` and add your API keys
 3. Install dependencies: `uv sync`
 4. Run locally: `python 02_agentcore_memory.py`
 
-## 📄 License
 
-MIT
